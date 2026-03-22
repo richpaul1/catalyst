@@ -15,9 +15,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
-import { externalChatbotQuery } from './tools/chatbot-query.js';
-import { sourceContentExtraction } from './tools/content-extract.js';
-import { chatbotQueryWithSources } from './tools/chatbot-with-sources.js';
+import { chatAnswerOnly } from './tools/chat-answer-only.js';
+import { crawl } from './tools/crawl.js';
+import { chatAnswerWithSources } from './tools/chat-answer-with-sources.js';
 import { createLogger } from './utils/logger.js';
 
 const log = createLogger('server');
@@ -30,7 +30,7 @@ const server = new McpServer({
 // ==================== Tool 1: external_chatbot_query ====================
 
 server.tool(
-    'external_chatbot_query',
+    'chat_answer_only',
     'Send a query to an external chatbot API (e.g., Mintlify, Intercom) and return the answer text along with any cited source URLs.',
     {
         chatbot_url: z.string().url().describe('The chatbot API endpoint URL'),
@@ -44,11 +44,11 @@ server.tool(
         timeout_ms: z.number().default(30000).describe('Request timeout in milliseconds'),
     },
     async (params) => {
-        log.info('external_chatbot_query called', { url: (params as any).chatbot_url, query: (params as any).query });
+        log.info('chat_answer_only called', { url: (params as any).chatbot_url, query: (params as any).query });
         const start = Date.now();
         try {
-            const result = await externalChatbotQuery(params as any);
-            log.info('external_chatbot_query completed', {
+            const result = await chatAnswerOnly(params as any);
+            log.info('chat_answer_only completed', {
                 durationMs: Date.now() - start,
                 statusCode: result.metadata.status_code,
                 sourcesCount: result.sources.length,
@@ -58,7 +58,7 @@ server.tool(
                 content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
             };
         } catch (err) {
-            log.error('external_chatbot_query failed', {
+            log.error('chat_answer_only failed', {
                 durationMs: Date.now() - start,
                 error: err instanceof Error ? err.message : String(err),
             });
@@ -70,7 +70,7 @@ server.tool(
 // ==================== Tool 2: source_content_extraction ====================
 
 server.tool(
-    'source_content_extraction',
+    'crawl',
     'Fetch HTML pages from given URLs and convert them to raw markdown, preserving all image and video references. Use this to extract rich content (with media) from documentation pages.',
     {
         urls: z.array(z.string().url()).describe('URLs to fetch and convert to markdown'),
@@ -82,11 +82,11 @@ server.tool(
         timeout_ms: z.number().default(30000).describe('Request timeout per page in milliseconds'),
     },
     async (params) => {
-        log.info('source_content_extraction called', { urlCount: params.urls.length, urls: params.urls });
+        log.info('crawl called', { urlCount: params.urls.length, urls: params.urls });
         const start = Date.now();
         try {
-            const result = await sourceContentExtraction(params);
-            log.info('source_content_extraction completed', {
+            const result = await crawl(params);
+            log.info('crawl completed', {
                 durationMs: Date.now() - start,
                 pagesExtracted: result.sources.length,
                 totalMedia: result.total_media_count,
@@ -96,7 +96,7 @@ server.tool(
                 content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
             };
         } catch (err) {
-            log.error('source_content_extraction failed', {
+            log.error('crawl failed', {
                 durationMs: Date.now() - start,
                 error: err instanceof Error ? err.message : String(err),
             });
@@ -105,24 +105,24 @@ server.tool(
     }
 );
 
-// ==================== Tool 3: chatbot_query_with_sources ====================
+// ==================== Tool 3: chat_answer_with_sources ====================
 
 server.tool(
-    'chatbot_query_with_sources',
+    'chat_answer_with_sources',
     'Query an external chatbot (e.g., Mintlify on docs.elementum.io), extract the cited source URLs from its response, then fetch and return the full markdown content from each source page. Returns both the chatbot answer and complete source documentation.',
     {
         query: z.string().describe('The question to ask the chatbot'),
         provider: z.string().default('mintlify').describe('Chatbot provider name (currently: "mintlify")'),
-        content_selector: z.string().default('article').describe('CSS selector to isolate main content on source pages'),
+        content_selector: z.string().default('#content').describe('CSS selector to isolate main content on source pages'),
         max_content_length: z.number().default(50000).describe('Max characters per source page'),
         timeout_ms: z.number().default(30000).describe('Request timeout in milliseconds'),
     },
     async (params) => {
-        log.info('chatbot_query_with_sources called', { provider: params.provider, query: params.query });
+        log.info('chat_answer_with_sources called', { provider: params.provider, query: params.query });
         const start = Date.now();
         try {
-            const result = await chatbotQueryWithSources(params);
-            log.info('chatbot_query_with_sources completed', {
+            const result = await chatAnswerWithSources(params);
+            log.info('chat_answer_with_sources completed', {
                 durationMs: Date.now() - start,
                 sourcesFound: result.metadata.sources_found,
                 sourcesExtracted: result.metadata.sources_extracted,
@@ -132,7 +132,7 @@ server.tool(
                 content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
             };
         } catch (err) {
-            log.error('chatbot_query_with_sources failed', {
+            log.error('chat_answer_with_sources failed', {
                 durationMs: Date.now() - start,
                 error: err instanceof Error ? err.message : String(err),
             });

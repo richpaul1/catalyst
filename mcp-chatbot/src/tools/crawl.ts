@@ -1,16 +1,16 @@
 /**
- * Source Content Extraction Tool
+ * Crawl Tool (Source Content Extraction)
  *
- * Fetches HTML pages from given URLs and converts them to raw markdown,
- * preserving image and video references. Returns the markdown content
- * and a catalog of all media references found.
+ * Fetches HTML pages from given URLs using a headless browser (Puppeteer),
+ * converts them to markdown while preserving image and video references.
+ * Uses headless rendering to handle JavaScript-heavy pages (React, Next.js, etc.).
  */
 
-import { fetchPage } from '../utils/http-client.js';
+import { fetchRenderedPage } from '../utils/headless-browser.js';
 import { htmlToMarkdown, extractTitle, type MediaReference } from '../utils/html-to-markdown.js';
 import { createLogger } from '../utils/logger.js';
 
-const log = createLogger('content-extract');
+const log = createLogger('crawl');
 
 export interface ContentExtractionParams {
     /** URLs to fetch and convert */
@@ -45,7 +45,7 @@ export interface ContentExtractionResult {
 }
 
 /** Maximum concurrent URL fetches */
-const MAX_CONCURRENT = 5;
+const MAX_CONCURRENT = 3;
 
 /**
  * Infer the base URL from a page URL (protocol + hostname)
@@ -60,7 +60,7 @@ function inferBaseUrl(url: string): string {
 }
 
 /**
- * Fetch and convert a single URL to markdown
+ * Fetch and convert a single URL to markdown using headless browser
  */
 async function extractSingleSource(
     url: string,
@@ -75,8 +75,8 @@ async function extractSingleSource(
 ): Promise<ExtractedSource> {
     const { contentSelector, stripNavigation, preserveMedia, mediaBaseUrl, maxContentLength, timeoutMs } = options;
 
-    // Fetch the page
-    const pageResult = await fetchPage(url, timeoutMs);
+    // Fetch the page using headless browser — content isolation happens in-browser
+    const pageResult = await fetchRenderedPage(url, timeoutMs, contentSelector);
 
     if (pageResult.error || !pageResult.html) {
         log.warn('Page fetch failed', { url, status: pageResult.status, error: pageResult.error });
@@ -96,9 +96,8 @@ async function extractSingleSource(
     // Determine base URL for resolving relative paths
     const baseUrl = mediaBaseUrl || inferBaseUrl(url);
 
-    // Convert HTML to markdown
+    // Convert HTML to markdown — no contentSelector needed since Puppeteer already isolated the content
     const { markdown, media } = htmlToMarkdown(pageResult.html, {
-        contentSelector,
         stripNavigation,
         preserveMedia,
         mediaBaseUrl: baseUrl,
@@ -139,7 +138,7 @@ async function processInBatches<T>(
 /**
  * Extract content from multiple URLs
  */
-export async function sourceContentExtraction(
+export async function crawl(
     params: ContentExtractionParams
 ): Promise<ContentExtractionResult> {
     const {

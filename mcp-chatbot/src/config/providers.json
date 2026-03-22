@@ -1,0 +1,16 @@
+{
+  "mintlify": {
+    "baseUrl": "https://docs.elementum.io",
+    "apiEndpoint": "https://leaves.mintlify.com/api/assistant/elementum/message",
+    "responseFormat": "vercel-ai-stream",
+    "requestTemplate": {
+      "id": "elementum",
+      "fp": "elementum",
+      "currentPath": "/"
+    },
+    "headers": {
+      "Origin": "https://docs.elementum.io",
+      "Referer": "https://docs.elementum.io/"
+    }
+  }
+}

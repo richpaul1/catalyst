@@ -121,10 +121,21 @@ function stripNavigationElements(doc: Document): void {
         '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]',
         '.sidebar', '.nav', '.navbar', '.menu', '.breadcrumb',
         '.table-of-contents', '.toc',
+        // Mintlify-specific selectors
+        '[class*="sidebar"]', '[class*="Sidebar"]',
+        '[class*="navigation"]', '[class*="Navigation"]',
+        '[class*="breadcrumb"]', '[class*="Breadcrumb"]',
+        '[class*="on-this-page"]', '[class*="toc"]',
+        '[id*="sidebar"]', '[id*="navigation"]',
+        'a[href="#content-area"]', // "Skip to main content" links
     ];
 
     selectors.forEach((selector) => {
-        doc.querySelectorAll(selector).forEach((el) => el.remove());
+        try {
+            doc.querySelectorAll(selector).forEach((el) => el.remove());
+        } catch {
+            // Some selectors may not be supported, skip
+        }
     });
 }
 
@@ -183,6 +194,50 @@ function createTurndownService(baseUrl: string, preserveMedia: boolean): Turndow
 }
 
 /**
+ * Strip Mintlify-specific artifacts that produce messy markdown.
+ * Mintlify wraps heading text with anchor tags containing zero-width spaces:
+ *   <h2><a href="#slug">​</a>Title</h2>
+ * These produce ugly [​](#slug) fragments in markdown output.
+ */
+function stripMintlifyArtifacts(doc: Document): void {
+    // Remove anchor tags inside headings that contain only whitespace/zero-width chars
+    doc.querySelectorAll('h1 a, h2 a, h3 a, h4 a, h5 a, h6 a').forEach((a) => {
+        const text = a.textContent || '';
+        // If the anchor only contains zero-width spaces, regular whitespace, or is empty — remove it
+        if (/^[\s\u200B\u200C\u200D\uFEFF]*$/.test(text)) {
+            a.remove();
+        }
+    });
+
+    // Remove "Copy" and "Ask AI" button elements that Mintlify injects into code blocks
+    doc.querySelectorAll('button').forEach((btn) => {
+        const text = (btn.textContent || '').trim();
+        if (text === 'Copy' || text === 'Ask AI') {
+            btn.remove();
+        }
+    });
+}
+
+/**
+ * Post-process markdown to clean up conversion artifacts
+ */
+function cleanMarkdown(md: string): string {
+    return md
+        // Remove zero-width space characters
+        .replace(/[\u200B\u200C\u200D\uFEFF]/g, '')
+        // Remove leftover empty anchor links: [](#...) or [ ](#...)
+        .replace(/\[[\s]*\]\(#[^)]*\)/g, '')
+        // Remove "Copy\n\nAsk AI" artifacts from code blocks
+        .replace(/\n*Copy\n+Ask AI\n*/g, '\n')
+        // Fix broken headings: "## \n\nTitle" → "## Title"
+        .replace(/^(#{1,6})\s*\n+\s*/gm, '$1 ')
+        // Collapse 3+ consecutive newlines to 2
+        .replace(/\n{3,}/g, '\n\n')
+        // Trim leading/trailing whitespace
+        .trim();
+}
+
+/**
  * Convert HTML to markdown with media preservation
  */
 export function htmlToMarkdown(html: string, options: ConversionOptions = {}): ConversionResult {
@@ -203,6 +258,9 @@ export function htmlToMarkdown(html: string, options: ConversionOptions = {}): C
     // Always strip non-content elements (scripts, styles, etc.)
     stripNonContentElements(doc);
 
+    // Strip Mintlify-specific artifacts (heading anchors, button text)
+    stripMintlifyArtifacts(doc);
+
     // Strip navigation elements
     if (stripNavigation) {
         stripNavigationElements(doc);
@@ -219,6 +277,9 @@ export function htmlToMarkdown(html: string, options: ConversionOptions = {}): C
     // Convert to markdown
     const turndown = createTurndownService(mediaBaseUrl, preserveMedia);
     let markdown = turndown.turndown(targetHtml);
+
+    // Post-process: clean up zero-width characters, empty anchors, excessive newlines
+    markdown = cleanMarkdown(markdown);
 
     // Truncate if needed
     if (markdown.length > maxContentLength) {

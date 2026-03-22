@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { externalChatbotQuery } from '../src/tools/chatbot-query.js';
+import { chatAnswerOnly } from '../src/tools/chat-answer-only.js';
 
 // Mock the http-client module
 vi.mock('../src/utils/http-client.js', () => ({
@@ -9,7 +9,7 @@ vi.mock('../src/utils/http-client.js', () => ({
 import { httpRequest } from '../src/utils/http-client.js';
 const mockHttpRequest = vi.mocked(httpRequest);
 
-describe('externalChatbotQuery', () => {
+describe('chatAnswerOnly', () => {
     beforeEach(() => {
         vi.resetAllMocks();
     });
@@ -28,7 +28,7 @@ describe('externalChatbotQuery', () => {
             responseTimeMs: 800,
         });
 
-        const result = await externalChatbotQuery({
+        const result = await chatAnswerOnly({
             chatbot_url: 'https://docs.example.com/api/chat',
             query: 'How do I configure webhooks?',
         });
@@ -53,7 +53,7 @@ describe('externalChatbotQuery', () => {
             responseTimeMs: 500,
         });
 
-        const result = await externalChatbotQuery({
+        const result = await chatAnswerOnly({
             chatbot_url: 'https://api.example.com/chat',
             query: 'What is the answer?',
             response_path: '$.choices[0].message.content',
@@ -73,7 +73,7 @@ describe('externalChatbotQuery', () => {
             responseTimeMs: 300,
         });
 
-        await externalChatbotQuery({
+        await chatAnswerOnly({
             chatbot_url: 'https://api.example.com/chat',
             query: 'test question',
             request_template: {
@@ -97,7 +97,7 @@ describe('externalChatbotQuery', () => {
             responseTimeMs: 200,
         });
 
-        await externalChatbotQuery({
+        await chatAnswerOnly({
             chatbot_url: 'https://api.example.com/chat',
             query: 'test',
             auth_type: 'bearer',
@@ -120,7 +120,7 @@ describe('externalChatbotQuery', () => {
             responseTimeMs: 100,
         });
 
-        const result = await externalChatbotQuery({
+        const result = await chatAnswerOnly({
             chatbot_url: 'https://api.example.com/chat',
             query: 'test',
         });
@@ -145,7 +145,7 @@ describe('externalChatbotQuery', () => {
             responseTimeMs: 400,
         });
 
-        const result = await externalChatbotQuery({
+        const result = await chatAnswerOnly({
             chatbot_url: 'https://api.example.com/chat',
             query: 'test',
         });

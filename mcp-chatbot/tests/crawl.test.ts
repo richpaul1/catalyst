@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { sourceContentExtraction } from '../src/tools/content-extract.js';
+import { crawl } from '../src/tools/crawl.js';
 
-// Mock the http-client module
-vi.mock('../src/utils/http-client.js', () => ({
-    fetchPage: vi.fn(),
+// Mock the headless browser module
+vi.mock('../src/utils/headless-browser.js', () => ({
+    fetchRenderedPage: vi.fn(),
 }));
 
-import { fetchPage } from '../src/utils/http-client.js';
-const mockFetchPage = vi.mocked(fetchPage);
+import { fetchRenderedPage } from '../src/utils/headless-browser.js';
+const mockFetchRendered = vi.mocked(fetchRenderedPage);
 
 const SAMPLE_HTML = `
 <!DOCTYPE html>
@@ -33,18 +33,18 @@ const SAMPLE_HTML = `
 </html>
 `;
 
-describe('sourceContentExtraction', () => {
+describe('crawl', () => {
     beforeEach(() => {
         vi.resetAllMocks();
     });
 
     it('should fetch and convert HTML to markdown with media preserved', async () => {
-        mockFetchPage.mockResolvedValue({
+        mockFetchRendered.mockResolvedValue({
             html: SAMPLE_HTML,
             status: 200,
         });
 
-        const result = await sourceContentExtraction({
+        const result = await crawl({
             urls: ['https://docs.example.com/webhooks/config'],
             preserve_media: true,
             media_base_url: 'https://docs.example.com',
@@ -77,12 +77,12 @@ describe('sourceContentExtraction', () => {
     });
 
     it('should handle content_selector to isolate content', async () => {
-        mockFetchPage.mockResolvedValue({
+        mockFetchRendered.mockResolvedValue({
             html: SAMPLE_HTML,
             status: 200,
         });
 
-        const result = await sourceContentExtraction({
+        const result = await crawl({
             urls: ['https://docs.example.com/webhooks/config'],
             content_selector: 'article',
             media_base_url: 'https://docs.example.com',
@@ -95,7 +95,7 @@ describe('sourceContentExtraction', () => {
     });
 
     it('should handle multiple URLs in parallel', async () => {
-        mockFetchPage
+        mockFetchRendered
             .mockResolvedValueOnce({
                 html: '<html><head><title>Page 1</title></head><body><p>Content 1</p></body></html>',
                 status: 200,
@@ -105,7 +105,7 @@ describe('sourceContentExtraction', () => {
                 status: 200,
             });
 
-        const result = await sourceContentExtraction({
+        const result = await crawl({
             urls: [
                 'https://docs.example.com/page1',
                 'https://docs.example.com/page2',
@@ -118,13 +118,13 @@ describe('sourceContentExtraction', () => {
     });
 
     it('should handle fetch failures gracefully', async () => {
-        mockFetchPage.mockResolvedValue({
+        mockFetchRendered.mockResolvedValue({
             html: '',
             status: 403,
             error: 'HTTP 403',
         });
 
-        const result = await sourceContentExtraction({
+        const result = await crawl({
             urls: ['https://private.example.com/page'],
         });
 
@@ -134,14 +134,14 @@ describe('sourceContentExtraction', () => {
     });
 
     it('should return error when no URLs provided', async () => {
-        const result = await sourceContentExtraction({ urls: [] });
+        const result = await crawl({ urls: [] });
 
         expect(result.sources).toEqual([]);
         expect(result.error).toBe('No URLs provided');
     });
 
     it('should report total media count across all sources', async () => {
-        mockFetchPage
+        mockFetchRendered
             .mockResolvedValueOnce({
                 html: '<html><head><title>P1</title></head><body><img src="/a.png" alt="A"/><img src="/b.png" alt="B"/></body></html>',
                 status: 200,
@@ -151,7 +151,7 @@ describe('sourceContentExtraction', () => {
                 status: 200,
             });
 
-        const result = await sourceContentExtraction({
+        const result = await crawl({
             urls: ['https://example.com/1', 'https://example.com/2'],
             media_base_url: 'https://example.com',
         });
@@ -160,12 +160,12 @@ describe('sourceContentExtraction', () => {
     });
 
     it('should resolve relative URLs using media_base_url', async () => {
-        mockFetchPage.mockResolvedValue({
+        mockFetchRendered.mockResolvedValue({
             html: '<html><head><title>T</title></head><body><img src="/assets/photo.jpg" alt="Photo"/></body></html>',
             status: 200,
         });
 
-        const result = await sourceContentExtraction({
+        const result = await crawl({
             urls: ['https://docs.example.com/page'],
             media_base_url: 'https://docs.example.com',
         });

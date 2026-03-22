@@ -100,7 +100,7 @@ function extractSources(responseBody: unknown, sourcesPath: string): ChatbotSour
 /**
  * Execute an external chatbot query
  */
-export async function externalChatbotQuery(params: ChatbotQueryParams): Promise<ChatbotQueryResult> {
+export async function chatAnswerOnly(params: ChatbotQueryParams): Promise<ChatbotQueryResult> {
     const {
         chatbot_url,
         query,
